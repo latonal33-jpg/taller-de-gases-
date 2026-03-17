@@ -1,0 +1,64 @@
+import streamlit as st
+import pandas as pd
+
+# Configuración de la página
+st.set_page_config(page_title="Taller de Gases CDMX", layout="centered")
+
+st.title("🫁 Taller de Gases Arteriales y Venosos")
+st.markdown("---")
+
+# --- SECCIÓN DE ENTRADA GENERAL ---
+st.sidebar.header("Datos Generales")
+hb = st.sidebar.number_input("Hemoglobina (HB) [g/dL]", value=15.0, step=0.1)
+fio2_pct = st.sidebar.slider("FiO2 (%)", 21, 100, 21)
+fio2_frac = fio2_pct / 100
+
+# --- COLUMNAS PARA GASOMETRÍAS ---
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🅰️ Arterial")
+    paco2 = st.number_input("PaCO2 [mmHg]", value=30.0)
+    pao2 = st.number_input("PaO2 [mmHg]", value=80.0)
+    sat_ao2 = st.number_input("Sat aO2 (%)", value=97.0) / 100
+
+with col2:
+    st.subheader("🅥 Venosa")
+    pvo2 = st.number_input("PvO2 [mmHg]", value=40.0)
+    sat_vo2 = st.number_input("Sat vO2 (%)", value=70.0) / 100
+
+# --- CÁLCULOS (Fórmulas del Taller) ---
+p_seco = 535.0  # Constante CDMX
+pio2 = p_seco * fio2_frac
+pao2_alv = pio2 - paco2
+gaao2 = pao2_alv - pao2
+
+# Contenidos (1.34 y 0.0034)
+cco2 = (1.34 * hb) + (0.0034 * pao2_alv)
+cao2 = (1.34 * hb * sat_ao2) + (0.0034 * pao2)
+cvo2 = (1.34 * hb * sat_vo2) + (0.0034 * pvo2)
+
+# Índices
+davo2 = cao2 - cvo2
+eqo2 = (davo2 / cao2) * 100
+qsqt = ((cco2 - cao2) / (cco2 - cvo2)) * 100
+kirby = pao2 / fio2_frac
+
+# --- MOSTRAR RESULTADOS ---
+st.markdown("---")
+st.header("📊 Reporte de Resultados")
+
+res_data = {
+    "Parámetro": ["PiO2", "PAO2 (Alveolar)", "GAaO2 (Gradiente)", "CaO2", "CvO2", "DavO2", "% Extracción", "Qs/Qt (Shunt)", "PaO2/FiO2"],
+    "Resultado": [f"{pio2:.1f}", f"{pao2_alv:.1f}", f"{gaao2:.1f}", f"{cao2:.1f}", f"{cvo2:.1f}", f"{davo2:.1f}", f"{eqo2:.1f}%", f"{qsqt:.1f}%", f"{kirby:.1f}"],
+    "Normal": ["112", "73-78", "20", "14-19", "11-16", "3-5", "20-30%", "<15%", ">300"]
+}
+
+df = pd.DataFrame(res_data)
+st.table(df)
+
+# --- ALERTAS CLÍNICAS ---
+if qsqt > 15:
+    st.error(f"⚠️ Shunt elevado: {qsqt:.1f}% (Normal <15%)")
+if kirby < 300:
+    st.warning(f"⚠️ Índice de Kirby bajo: {kirby:.1f} (Riesgo de SDRA)")
